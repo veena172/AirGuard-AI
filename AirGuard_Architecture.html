@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a0f1e; font-family: 'Segoe UI', sans-serif; padding: 30px; }
+.arch { max-width: 1100px; margin: 0 auto; }
+h1 { color: #00d4ff; font-size: 20px; margin-bottom: 6px; }
+.subtitle { color: #64748b; font-size: 13px; margin-bottom: 24px; }
+.layer { margin-bottom: 16px; }
+.layer-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.layer-title::after { content: ''; flex: 1; height: 1px; background: #1e3a5f; }
+.boxes { display: flex; gap: 10px; flex-wrap: wrap; }
+.box { background: #111827; border: 1px solid; border-radius: 10px; padding: 12px 14px; flex: 1; min-width: 140px; }
+.box-title { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+.box-desc { font-size: 10px; color: #64748b; line-height: 1.4; }
+.box-icon { font-size: 20px; margin-bottom: 6px; }
+.blue { border-color: #1e4080; } .blue .box-title { color: #60a5fa; }
+.teal { border-color: #0d5260; } .teal .box-title { color: #00d4ff; }
+.green { border-color: #14532d; } .green .box-title { color: #00ff9d; }
+.purple { border-color: #4a1d7a; } .purple .box-title { color: #a78bfa; }
+.orange { border-color: #7c2d12; } .orange .box-title { color: #fb923c; }
+.red { border-color: #7f1d1d; } .red .box-title { color: #f87171; }
+.arrow { text-align: center; color: #1e3a5f; font-size: 20px; margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="arch">
+<h1>AirGuard AI — System Architecture</h1>
+<div class="subtitle">Urban Air Quality Intelligence Platform • ET AI Hackathon 2026 • Problem Statement 5</div>
+
+<div class="layer">
+  <div class="layer-title">DATA INGESTION LAYER</div>
+  <div class="boxes">
+    <div class="box blue"><div class="box-icon">📡</div><div class="box-title">CAAQMS / IoT Sensors</div><div class="box-desc">900+ CPCB monitoring stations. Real-time PM2.5, PM10, NO₂, SO₂, CO, O₃ streams via MQTT</div></div>
+    <div class="box blue"><div class="box-icon">🛰️</div><div class="box-title">Satellite Imagery</div><div class="box-desc">Sentinel-2 thermal bands, MODIS AOD data, Google Earth Engine API integration</div></div>
+    <div class="box blue"><div class="box-icon">🌡️</div><div class="box-title">Meteorological Data</div><div class="box-desc">IMD wind speed/direction, temperature, humidity, atmospheric pressure forecasts</div></div>
+    <div class="box blue"><div class="box-icon">🚗</div><div class="box-title">Mobility & Traffic</div><div class="box-desc">HERE Maps API, VAHAN fleet registry, GPS trace data for traffic density estimation</div></div>
+    <div class="box blue"><div class="box-icon">📋</div><div class="box-title">Permit & Registry</div><div class="box-desc">Construction permits, industrial licenses, CPCB industrial stack records</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<div class="layer">
+  <div class="layer-title">DATA PROCESSING & FUSION LAYER</div>
+  <div class="boxes">
+    <div class="box teal"><div class="box-icon">⚡</div><div class="box-title">Apache Kafka</div><div class="box-desc">Real-time event streaming. 50k+ events/sec throughput across all sensor feeds</div></div>
+    <div class="box teal"><div class="box-icon">🔀</div><div class="box-title">Apache Spark</div><div class="box-desc">Distributed processing, spatial joins, sensor anomaly detection at scale</div></div>
+    <div class="box teal"><div class="box-icon">🗄️</div><div class="box-title">TimescaleDB</div><div class="box-desc">Time-series storage optimised for sensor data. InfluxDB for high-frequency writes</div></div>
+    <div class="box teal"><div class="box-icon">🌍</div><div class="box-title">PostGIS / GeoServer</div><div class="box-desc">Geospatial data store. Ward boundary polygons, source location registry</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<div class="layer">
+  <div class="layer-title">AI INTELLIGENCE LAYER — MULTI-AGENT SYSTEM</div>
+  <div class="boxes">
+    <div class="box green"><div class="box-icon">🔬</div><div class="box-title">Source Attribution Agent</div><div class="box-desc">Spatial-temporal ML model (XGBoost + SHAP). Attributes pollution % by source per ward with confidence scores</div></div>
+    <div class="box green"><div class="box-icon">📈</div><div class="box-title">AQI Forecast Agent</div><div class="box-desc">LSTM + Transformer hybrid. 24-72 hr forecast at 1km grid. RMSE 18.4 vs persistence baseline 34.2</div></div>
+    <div class="box green"><div class="box-icon">🚨</div><div class="box-title">Enforcement Intel Agent</div><div class="box-desc">RAG over violation history + satellite evidence. Ranks enforcement actions by impact score</div></div>
+    <div class="box green"><div class="box-icon">💬</div><div class="box-title">Citizen Advisory Agent</div><div class="box-desc">LLM (Claude API) generating ward-level health advisories in 12 regional languages. Personalised by vulnerability</div></div>
+    <div class="box green"><div class="box-icon">🏭</div><div class="box-title">Anomaly Detection Agent</div><div class="box-desc">Isolation Forest + sensor fusion. Detects unusual emission events. Alert latency &lt;3 min</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<div class="layer">
+  <div class="layer-title">PRESENTATION LAYER</div>
+  <div class="boxes">
+    <div class="box purple"><div class="box-icon">🗺️</div><div class="box-title">Command Dashboard</div><div class="box-desc">Real-time geospatial heatmap for administrators. Leaflet.js + WebSocket live updates</div></div>
+    <div class="box purple"><div class="box-icon">📱</div><div class="box-title">Mobile App</div><div class="box-desc">Citizen AQI app with personalised advisories, route planner, mask reminders. React Native</div></div>
+    <div class="box purple"><div class="box-icon">📞</div><div class="box-title">IVR / WhatsApp Bot</div><div class="box-desc">Voice-based AQI advisory for non-smartphone users. 12 languages. Twilio integration</div></div>
+    <div class="box purple"><div class="box-icon">🚔</div><div class="box-title">Enforcement App</div><div class="box-desc">Field officer mobile app with GPS-linked enforcement tasks, satellite evidence viewer, e-notice generation</div></div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

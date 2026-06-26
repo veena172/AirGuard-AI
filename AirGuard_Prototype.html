@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AirGuard AI — Urban Air Quality Intelligence Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0f1e;
+    --panel: #111827;
+    --card: #1a2235;
+    --border: #1e3a5f;
+    --accent: #00d4ff;
+    --accent2: #00ff9d;
+    --warn: #ff6b35;
+    --danger: #ff2d55;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --good: #22c55e;
+    --moderate: #f59e0b;
+    --poor: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* HEADER */
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    z-index: 1000;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 34px; height: 34px; background: linear-gradient(135deg, #00d4ff, #00ff9d); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .logo-text { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+  .logo-text span { color: var(--accent); }
+  .header-stats { display: flex; gap: 20px; }
+  .hstat { text-align: center; }
+  .hstat-val { font-size: 20px; font-weight: 700; line-height: 1; }
+  .hstat-label { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .live-badge { display: flex; align-items: center; gap: 6px; background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3); padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+  .live-dot { width: 7px; height: 7px; background: var(--accent2); border-radius: 50%; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+
+  /* NAV TABS */
+  .nav-tabs { display: flex; background: var(--panel); border-bottom: 1px solid var(--border); padding: 0 20px; flex-shrink: 0; }
+  .nav-tab { padding: 10px 18px; cursor: pointer; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* MAIN LAYOUT */
+  .main { flex: 1; display: flex; overflow: hidden; }
+
+  /* LEFT SIDEBAR */
+  .sidebar { width: 300px; background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .sidebar-section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+
+  /* AQI GAUGE */
+  .aqi-gauge { text-align: center; }
+  .aqi-number { font-size: 56px; font-weight: 800; line-height: 1; }
+  .aqi-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .aqi-status { display: inline-block; padding: 3px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-top: 6px; }
+
+  /* POLLUTANT BARS */
+  .pollutant-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .pollutant-name { font-size: 12px; color: var(--muted); width: 40px; flex-shrink: 0; }
+  .pollutant-bar-track { flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+  .pollutant-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+  .pollutant-val { font-size: 11px; width: 38px; text-align: right; flex-shrink: 0; }
+
+  /* SOURCE CARDS */
+  .source-card { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 7px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 6px; cursor: pointer; transition: all 0.2s; }
+  .source-card:hover { background: rgba(0,212,255,0.05); border-color: rgba(0,212,255,0.2); }
+  .source-icon { width: 32px; height: 32px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .source-info { flex: 1; }
+  .source-name { font-size: 12px; font-weight: 600; }
+  .source-contrib { font-size: 11px; color: var(--muted); }
+  .source-pct { font-size: 15px; font-weight: 700; }
+
+  /* CENTER MAP */
+  .map-area { flex: 1; position: relative; display: flex; flex-direction: column; }
+  #map { flex: 1; }
+  .map-controls { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
+  .map-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+  .map-btn:hover, .map-btn.active { background: rgba(0,212,255,0.15); border-color: var(--accent); color: var(--accent); }
+  .map-legend { position: absolute; bottom: 12px; left: 12px; background: rgba(17,24,39,0.92); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; z-index: 1000; }
+  .legend-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 7px; }
+  .legend-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; font-size: 11px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* RIGHT PANEL */
+  .right-panel { width: 310px; background: var(--panel); border-left: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* FORECAST CHART */
+  .chart-container { height: 160px; }
+
+  /* ALERTS */
+  .alert-item { display: flex; gap: 10px; padding: 10px; border-radius: 8px; margin-bottom: 7px; border: 1px solid; }
+  .alert-icon { font-size: 18px; flex-shrink: 0; }
+  .alert-title { font-size: 12px; font-weight: 600; }
+  .alert-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .alert-time { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .alert-critical { background: rgba(255,45,85,0.08); border-color: rgba(255,45,85,0.25); }
+  .alert-warning { background: rgba(255,107,53,0.08); border-color: rgba(255,107,53,0.25); }
+  .alert-info { background: rgba(0,212,255,0.06); border-color: rgba(0,212,255,0.2); }
+
+  /* ENFORCEMENT */
+  .enf-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+  .enf-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  .enf-name { font-size: 13px; font-weight: 600; }
+  .enf-priority { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+  .priority-high { background: rgba(255,45,85,0.2); color: #ff2d55; }
+  .priority-medium { background: rgba(255,107,53,0.2); color: #ff6b35; }
+  .enf-detail { font-size: 11px; color: var(--muted); }
+  .enf-action { margin-top: 8px; font-size: 11px; background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2); padding: 5px 10px; border-radius: 6px; color: var(--accent); }
+
+  /* FORECAST TAB */
+  .forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .forecast-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
+  .forecast-time { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .forecast-aqi { font-size: 28px; font-weight: 800; }
+  .forecast-status { font-size: 11px; margin-top: 3px; }
+  .forecast-arrow { font-size: 14px; }
+
+  /* ADVISORY TAB */
+  .ward-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+  .ward-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .ward-name { font-size: 13px; font-weight: 600; }
+  .ward-aqi-badge { padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; }
+  .advisory-text { font-size: 12px; color: #cbd5e1; line-height: 1.5; }
+  .vulnerable-icons { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .vuln-chip { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 10px; font-size: 10px; display: flex; align-items: center; gap: 4px; }
+  .lang-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .lang-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 5px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; }
+  .lang-btn.active { background: rgba(0,212,255,0.1); border-color: var(--accent); color: var(--accent); }
+
+  /* PAGE SECTIONS */
+  .page { display: none; flex: 1; overflow: hidden; }
+  .page.active { display: flex; }
+  .content-page { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .content-page.active { display: flex; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* TOOLTIP */
+  .tooltip-box { background: var(--card); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; font-size: 12px; min-width: 160px; }
+  .tooltip-title { font-weight: 700; margin-bottom: 4px; }
+  .leaflet-popup-content-wrapper { background: transparent !important; border: none !important; box-shadow: none !important; }
+  .leaflet-popup-tip-container { display: none !important; }
+  .leaflet-popup-content { margin: 0 !important; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+  .ai-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(0,255,157,0.1); border: 1px solid rgba(0,255,157,0.3); padding: 2px 8px; border-radius: 10px; font-size: 10px; color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌫️</div>
+    <div>
+      <div class="logo-text">Air<span>Guard</span> AI</div>
+      <div style="font-size:10px;color:var(--muted)">Urban Air Quality Intelligence Platform</div>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="hstat">
+      <div class="hstat-val" style="color:#ef4444" id="city-aqi">218</div>
+      <div class="hstat-label">City AQI</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" style="color:#f59e0b">42</div>
+      <div class="hstat-label">Active Stations</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" style="color:#ff6b35">8</div>
+      <div class="hstat-label">Hotspots</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" style="color:#ff2d55">3</div>
+      <div class="hstat-label">Alerts</div>
+    </div>
+  </div>
+  <div class="live-badge">
+    <div class="live-dot"></div>
+    LIVE • Delhi NCR • Updated 2 min ago
+  </div>
+</header>
+
+<!-- NAV TABS -->
+<div class="nav-tabs">
+  <div class="nav-tab active" onclick="switchTab('map')">🗺️ Live Map</div>
+  <div class="nav-tab" onclick="switchTab('forecast')">📈 AI Forecast</div>
+  <div class="nav-tab" onclick="switchTab('enforcement')">🚨 Enforcement</div>
+  <div class="nav-tab" onclick="switchTab('advisory')">📢 Citizen Advisory</div>
+  <div class="nav-tab" onclick="switchTab('source')">🔬 Source Attribution</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- ===== TAB: MAP ===== -->
+  <div class="tab-content active" id="tab-map" style="flex-direction:row;flex:1;overflow:hidden">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="section-title">📍 Selected Zone — Anand Vihar</div>
+        <div class="aqi-gauge">
+          <div class="aqi-number" style="color:#ef4444">286</div>
+          <div class="aqi-label">Air Quality Index</div>
+          <div class="aqi-status" style="background:rgba(239,68,68,0.15);color:#ef4444">Very Poor</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-title">💨 Pollutant Breakdown</div>
+        <div class="pollutant-row">
+          <div class="pollutant-name">PM2.5</div>
+          <div class="pollutant-bar-track"><div class="pollutant-bar-fill" style="width:88%;background:#ef4444"></div></div>
+          <div class="pollutant-val" style="color:#ef4444">186 µg</div>
+        </div>
+        <div class="pollutant-row">
+          <div class="pollutant-name">PM10</div>
+          <div class="pollutant-bar-track"><div class="pollutant-bar-fill" style="width:72%;background:#f59e0b"></div></div>
+          <div class="pollutant-val" style="color:#f59e0b">290 µg</div>
+        </div>
+        <div class="pollutant-row">
+          <div class="pollutant-name">NO₂</div>
+          <div class="pollutant-bar-track"><div class="pollutant-bar-fill" style="width:55%;background:#f59e0b"></div></div>
+          <div class="pollutant-val" style="color:#f59e0b">82 µg</div>
+        </div>
+        <div class="pollutant-row">
+          <div class="pollutant-name">SO₂</div>
+          <div class="pollutant-bar-track"><div class="pollutant-bar-fill" style="width:30%;background:#22c55e"></div></div>
+          <div class="pollutant-val" style="color:#22c55e">28 µg</div>
+        </div>
+        <div class="pollutant-row">
+          <div class="pollutant-name">CO</div>
+          <div class="pollutant-bar-track"><div class="pollutant-bar-fill" style="width:45%;background:#f59e0b"></div></div>
+          <div class="pollutant-val" style="color:#f59e0b">1.8 mg</div>
+        </div>
+        <div class="pollutant-row">
+          <div class="pollutant-name">O₃</div>
+          <div class="pollutant-bar-track"><div class="pollutant-bar-fill" style="width:20%;background:#22c55e"></div></div>
+          <div class="pollutant-val" style="color:#22c55e">44 µg</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-title">🏭 Top Pollution Sources <span class="ai-badge">AI Attributed</span></div>
+        <div class="source-card" onclick="highlightSource('traffic')">
+          <div class="source-icon" style="background:rgba(239,68,68,0.15)">🚗</div>
+          <div class="source-info">
+            <div class="source-name">Vehicle Emissions</div>
+            <div class="source-contrib">NH-24 & Ring Road</div>
+          </div>
+          <div class="source-pct" style="color:#ef4444">42%</div>
+        </div>
+        <div class="source-card" onclick="highlightSource('industrial')">
+          <div class="source-icon" style="background:rgba(255,107,53,0.15)">🏭</div>
+          <div class="source-info">
+            <div class="source-name">Industrial Stacks</div>
+            <div class="source-contrib">3 units flagged</div>
+          </div>
+          <div class="source-pct" style="color:#ff6b35">28%</div>
+        </div>
+        <div class="source-card" onclick="highlightSource('construction')">
+          <div class="source-icon" style="background:rgba(245,158,11,0.15)">🏗️</div>
+          <div class="source-info">
+            <div class="source-name">Construction Dust</div>
+            <div class="source-contrib">Geeta Colony site</div>
+          </div>
+          <div class="source-pct" style="color:#f59e0b">18%</div>
+        </div>
+        <div class="source-card">
+          <div class="source-icon" style="background:rgba(100,116,139,0.15)">🔥</div>
+          <div class="source-info">
+            <div class="source-name">Waste Burning</div>
+            <div class="source-contrib">2 locations</div>
+          </div>
+          <div class="source-pct" style="color:#94a3b8">12%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAP -->
+    <div class="map-area">
+      <div id="map"></div>
+      <div class="map-controls">
+        <button class="map-btn active" onclick="toggleLayer('heatmap', this)">🔥 Heatmap</button>
+        <button class="map-btn" onclick="toggleLayer('stations', this)">📡 Stations</button>
+        <button class="map-btn" onclick="toggleLayer('sources', this)">🏭 Sources</button>
+        <button class="map-btn" onclick="toggleLayer('wind', this)">💨 Wind</button>
+      </div>
+      <div class="map-legend">
+        <div class="legend-title">AQI Level</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#22c55e"></div>Good (0–50)</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#f59e0b"></div>Moderate (51–100)</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#ff6b35"></div>Poor (101–200)</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#ef4444"></div>Very Poor (201–300)</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#7c3aed"></div>Severe (300+)</div>
+      </div>
+    </div>
+
+    <!-- Right Panel - Alerts -->
+    <div class="right-panel">
+      <div class="sidebar-section">
+        <div class="section-title">🚨 Live AI Alerts</div>
+        <div class="alert-item alert-critical">
+          <div class="alert-icon">🔴</div>
+          <div>
+            <div class="alert-title">Hazardous AQI — Anand Vihar</div>
+            <div class="alert-desc">PM2.5 at 186 µg/m³ — 12× WHO limit. Industrial source spike detected by AI.</div>
+            <div class="alert-time">⏱ 8 min ago</div>
+          </div>
+        </div>
+        <div class="alert-item alert-warning">
+          <div class="alert-icon">🟠</div>
+          <div>
+            <div class="alert-title">Unauthorized Burning — Bhalswa</div>
+            <div class="alert-desc">Satellite thermal anomaly + sensor correlation. Enforcement dispatched.</div>
+            <div class="alert-time">⏱ 23 min ago</div>
+          </div>
+        </div>
+        <div class="alert-item alert-info">
+          <div class="alert-icon">🔵</div>
+          <div>
+            <div class="alert-title">AQI Forecast Alert — Tomorrow</div>
+            <div class="alert-desc">AQI expected to exceed 300 by 8 AM. Pre-emptive action recommended.</div>
+            <div class="alert-time">⏱ AI Prediction • 1 hr ahead</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-title">📊 24-Hour Trend</div>
+        <div class="chart-container">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-title">🏥 Health Impact Estimate</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#ef4444">2.4M</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:3px">People Affected Today</div>
+          </div>
+          <div style="background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.2);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#ff6b35">847</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:3px">Vulnerable at Risk</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: FORECAST ===== -->
+  <div class="tab-content" id="tab-forecast" style="flex:1;flex-direction:column;padding:20px;overflow-y:auto;gap:16px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <h2 style="font-size:16px">AI-Powered 72-Hour AQI Forecast</h2>
+      <span class="ai-badge">🤖 ML Model • RMSE: 18.4</span>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Delhi NCR — Forecast vs Actual (AQI)</div>
+      <div style="height:220px"><canvas id="forecastChart"></canvas></div>
+    </div>
+    <div class="forecast-grid">
+      <div class="forecast-card">
+        <div class="forecast-time">Today 6 PM</div>
+        <div class="forecast-aqi" style="color:#ef4444">241</div>
+        <div class="forecast-status" style="color:#ef4444">Very Poor ↑</div>
+      </div>
+      <div class="forecast-card">
+        <div class="forecast-time">Tonight 12 AM</div>
+        <div class="forecast-aqi" style="color:#7c3aed">318</div>
+        <div class="forecast-status" style="color:#7c3aed">Severe ↑↑</div>
+      </div>
+      <div class="forecast-card">
+        <div class="forecast-time">Tomorrow 8 AM</div>
+        <div class="forecast-aqi" style="color:#7c3aed">334</div>
+        <div class="forecast-status" style="color:#7c3aed">Severe ↑↑</div>
+      </div>
+      <div class="forecast-card">
+        <div class="forecast-time">Tomorrow 6 PM</div>
+        <div class="forecast-aqi" style="color:#ef4444">278</div>
+        <div class="forecast-status" style="color:#ef4444">Very Poor ↓</div>
+      </div>
+      <div class="forecast-card">
+        <div class="forecast-time">Day 3 Morning</div>
+        <div class="forecast-aqi" style="color:#f59e0b">165</div>
+        <div class="forecast-status" style="color:#f59e0b">Poor ↓</div>
+      </div>
+      <div class="forecast-card">
+        <div class="forecast-time">Day 3 Evening</div>
+        <div class="forecast-aqi" style="color:#f59e0b">142</div>
+        <div class="forecast-status" style="color:#f59e0b">Poor →</div>
+      </div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">🌡️ Driving Factors (AI Analysis)</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+          <span>🌬️ Low wind speed tonight (2 km/h)</span><span style="color:#ef4444;font-size:12px">High Impact</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+          <span>🌡️ Temperature inversion at 500m</span><span style="color:#ef4444;font-size:12px">High Impact</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+          <span>🌾 Paddy stubble burning (Punjab)</span><span style="color:#f59e0b;font-size:12px">Medium Impact</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+          <span>🚗 Peak hour traffic (8–9 AM)</span><span style="color:#f59e0b;font-size:12px">Medium Impact</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: ENFORCEMENT ===== -->
+  <div class="tab-content" id="tab-enforcement" style="flex:1;flex-direction:column;padding:20px;overflow-y:auto;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h2 style="font-size:16px">🚨 AI Enforcement Intelligence</h2>
+      <span class="ai-badge">🤖 Ranked by AI Impact Score</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:800;color:#ff2d55">12</div>
+        <div style="font-size:11px;color:var(--muted)">Active Violations</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:800;color:#f59e0b">5</div>
+        <div style="font-size:11px;color:var(--muted)">Teams Deployed</div>
+      </div>
+    </div>
+
+    <div class="enf-card">
+      <div class="enf-header">
+        <div><div class="enf-name">🏭 Naraina Industrial Area — Unit #7</div><div class="enf-detail" style="margin-top:3px">PM2.5 emission 4.2× permitted limit detected via sensor + satellite</div></div>
+        <div class="enf-priority priority-high">HIGH</div>
+      </div>
+      <div class="enf-detail">📍 28.6°N, 77.1°E &nbsp;|&nbsp; ⏱ Detected 42 min ago &nbsp;|&nbsp; 💥 AI Impact Score: 94/100</div>
+      <div class="enf-action">🤖 AI Recommendation: Deploy inspector immediately. Cross-reference with last inspection (34 days ago). Issue show-cause notice.</div>
+    </div>
+
+    <div class="enf-card">
+      <div class="enf-header">
+        <div><div class="enf-name">🔥 Bhalswa Landfill — Illegal Burning</div><div class="enf-detail" style="margin-top:3px">Thermal anomaly from Sentinel-2 satellite + NH-48 sensor spike correlated</div></div>
+        <div class="enf-priority priority-high">HIGH</div>
+      </div>
+      <div class="enf-detail">📍 28.75°N, 77.17°E &nbsp;|&nbsp; ⏱ Detected 23 min ago &nbsp;|&nbsp; 💥 AI Impact Score: 89/100</div>
+      <div class="enf-action">🤖 AI Recommendation: Immediate field team dispatch. Coordinate with MCD. Satellite imagery attached as evidence.</div>
+    </div>
+
+    <div class="enf-card">
+      <div class="enf-header">
+        <div><div class="enf-name">🏗️ Geeta Colony Construction Site</div><div class="enf-detail" style="margin-top:3px">No dust suppression measures active. Wind speed 18 km/h — high spread risk.</div></div>
+        <div class="enf-priority priority-medium">MEDIUM</div>
+      </div>
+      <div class="enf-detail">📍 28.66°N, 77.25°E &nbsp;|&nbsp; ⏱ Detected 1.5 hrs ago &nbsp;|&nbsp; 💥 AI Impact Score: 71/100</div>
+      <div class="enf-action">🤖 AI Recommendation: Issue notice for dust netting installation. Halt work until compliance. Builder permit #DCB-2024-4471.</div>
+    </div>
+
+    <div class="enf-card">
+      <div class="enf-header">
+        <div><div class="enf-name">🚗 NH-24 Diesel Fleet Check</div><div class="enf-detail" style="margin-top:3px">NO₂ spike 6 AM–9 AM. Heavy diesel fleet movement pattern detected via sensors.</div></div>
+        <div class="enf-priority priority-medium">MEDIUM</div>
+      </div>
+      <div class="enf-detail">📍 NH-24 Toll Plaza &nbsp;|&nbsp; ⏱ Recurring daily &nbsp;|&nbsp; 💥 AI Impact Score: 65/100</div>
+      <div class="enf-action">🤖 AI Recommendation: Place PUC check team at toll plaza 5:30–9:00 AM. Estimated catch rate: 8–12 violators/day.</div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: ADVISORY ===== -->
+  <div class="tab-content" id="tab-advisory" style="flex:1;flex-direction:column;padding:20px;overflow-y:auto;gap:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h2 style="font-size:16px">📢 Citizen Health Advisory</h2>
+      <span class="ai-badge">🤖 AI Generated • Multilingual</span>
+    </div>
+
+    <div class="lang-btns">
+      <button class="lang-btn active" onclick="setLang('en', this)">English</button>
+      <button class="lang-btn" onclick="setLang('hi', this)">हिंदी</button>
+      <button class="lang-btn" onclick="setLang('ta', this)">தமிழ்</button>
+      <button class="lang-btn" onclick="setLang('kn', this)">ಕನ್ನಡ</button>
+      <button class="lang-btn" onclick="setLang('bn', this)">বাংলা</button>
+    </div>
+
+    <div id="advisory-content">
+      <!-- English default -->
+      <div class="ward-card">
+        <div class="ward-header">
+          <div class="ward-name">📍 Anand Vihar</div>
+          <div class="ward-aqi-badge" style="background:rgba(239,68,68,0.15);color:#ef4444">AQI 286 — Very Poor</div>
+        </div>
+        <div class="advisory-text" id="adv-anand">⚠️ Air quality is Very Poor today. Avoid all outdoor activities. Keep windows closed. Use N95 masks if stepping out. Children, elderly, and people with respiratory conditions must stay indoors.</div>
+        <div class="vulnerable-icons">
+          <div class="vuln-chip">👴 Elderly: High Risk</div>
+          <div class="vuln-chip">🧒 Children: High Risk</div>
+          <div class="vuln-chip">🏥 Asthma Patients: Critical</div>
+          <div class="vuln-chip">🤰 Pregnant: Avoid Outdoors</div>
+        </div>
+      </div>
+      <div class="ward-card">
+        <div class="ward-header">
+          <div class="ward-name">📍 Dwarka Sector 10</div>
+          <div class="ward-aqi-badge" style="background:rgba(255,107,53,0.15);color:#ff6b35">AQI 178 — Poor</div>
+        </div>
+        <div class="advisory-text" id="adv-dwarka">Air quality is Poor. Limit outdoor exposure, especially in the morning. Avoid exercising outdoors. Wear a mask when outside. Keep indoor air purifiers running if available.</div>
+        <div class="vulnerable-icons">
+          <div class="vuln-chip">👴 Elderly: Moderate Risk</div>
+          <div class="vuln-chip">🧒 Children: Limit Play</div>
+          <div class="vuln-chip">🏃 Outdoor Workers: Use Mask</div>
+        </div>
+      </div>
+      <div class="ward-card">
+        <div class="ward-header">
+          <div class="ward-name">📍 Lodhi Garden Area</div>
+          <div class="ward-aqi-badge" style="background:rgba(245,158,11,0.15);color:#f59e0b">AQI 112 — Moderate</div>
+        </div>
+        <div class="advisory-text" id="adv-lodhi">Air quality is Moderate. Sensitive individuals should reduce prolonged outdoor activity. Generally safe for most people. Monitor AQI updates throughout the day.</div>
+        <div class="vulnerable-icons">
+          <div class="vuln-chip">🌿 Relatively Safer Zone</div>
+          <div class="vuln-chip">👴 Sensitive Groups: Caution</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: SOURCE ATTRIBUTION ===== -->
+  <div class="tab-content" id="tab-source" style="flex:1;flex-direction:column;padding:20px;overflow-y:auto;gap:16px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <h2 style="font-size:16px">🔬 AI Pollution Source Attribution</h2>
+      <span class="ai-badge">🤖 Satellite + Sensor Fusion</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Source Contribution — Anand Vihar (Today)</div>
+        <div style="height:200px"><canvas id="sourceChart"></canvas></div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Monthly Trend by Source Category</div>
+        <div style="height:200px"><canvas id="trendSourceChart"></canvas></div>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">🛰️ Satellite Evidence — Bhalswa Thermal Anomaly</div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="flex:1;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:12px;color:var(--muted);border:1px dashed var(--border)">
+          <div style="text-align:center;padding:20px 0">
+            🛰️ Sentinel-2 Thermal Band<br>
+            <span style="font-size:10px">28.75°N, 77.17°E — Captured 06:42 AM</span><br><br>
+            <span style="background:rgba(239,68,68,0.2);color:#ef4444;padding:4px 10px;border-radius:6px;font-size:11px">🔴 Thermal Anomaly Detected</span>
+          </div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;margin-bottom:8px;font-weight:600">AI Attribution Analysis</div>
+          <div style="font-size:12px;color:#cbd5e1;line-height:1.7">
+            ✅ Thermal hotspot matches landfill GPS coordinates<br>
+            ✅ PM2.5 spike at NH-48 station — 22 min delay (wind-consistent)<br>
+            ✅ No permitted industrial activity in 2km radius<br>
+            ✅ Pattern matches 3 previous burning incidents (Oct, Nov)<br><br>
+            <span style="color:var(--accent2);font-weight:600">Confidence Score: 91%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end main -->
+
+<script>
+// ===== TAB SWITCHING =====
+function switchTab(name) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'forecast') initForecastChart();
+  if (name === 'source') initSourceCharts();
+}
+
+// ===== MAP INIT =====
+const map = L.map('map', { zoomControl: false }).setView([28.65, 77.22], 11);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© CartoDB', maxZoom: 19
+}).addTo(map);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Hotspot data
+const hotspots = [
+  { lat: 28.646, lng: 77.315, aqi: 286, name: 'Anand Vihar', color: '#ef4444', r: 50 },
+  { lat: 28.751, lng: 77.168, aqi: 312, name: 'Bhalswa', color: '#7c3aed', r: 45 },
+  { lat: 28.683, lng: 77.103, aqi: 198, name: 'Naraina', color: '#ff6b35', r: 40 },
+  { lat: 28.595, lng: 77.247, aqi: 178, name: 'Sarai Kale Khan', color: '#ff6b35', r: 38 },
+  { lat: 28.632, lng: 77.216, aqi: 142, name: 'Lodhi Road Area', color: '#f59e0b', r: 35 },
+  { lat: 28.703, lng: 77.102, aqi: 226, name: 'Rohini Sector 8', color: '#ef4444', r: 42 },
+  { lat: 28.560, lng: 77.090, aqi: 168, name: 'Dwarka Sec 10', color: '#ff6b35', r: 36 },
+  { lat: 28.710, lng: 77.255, aqi: 94, name: 'Vasundhara', color: '#22c55e', r: 30 },
+];
+
+hotspots.forEach(h => {
+  L.circle([h.lat, h.lng], {
+    radius: h.r * 60,
+    fillColor: h.color,
+    fillOpacity: 0.35,
+    color: h.color,
+    weight: 1.5,
+    opacity: 0.7
+  }).bindPopup(`<div class="tooltip-box"><div class="tooltip-title">${h.name}</div>AQI: <b style="color:${h.color}">${h.aqi}</b><br><small style="color:#94a3b8">Click sidebar sources to highlight</small></div>`).addTo(map);
+});
+
+// Station markers
+const stations = [
+  { lat: 28.646, lng: 77.315, label: 'AV', aqi: 286 },
+  { lat: 28.683, lng: 77.103, label: 'NR', aqi: 198 },
+  { lat: 28.632, lng: 77.216, label: 'LR', aqi: 142 },
+  { lat: 28.751, lng: 77.168, label: 'BH', aqi: 312 },
+  { lat: 28.560, lng: 77.090, label: 'DW', aqi: 168 },
+];
+
+stations.forEach(s => {
+  const color = s.aqi > 300 ? '#7c3aed' : s.aqi > 200 ? '#ef4444' : s.aqi > 100 ? '#ff6b35' : '#22c55e';
+  L.marker([s.lat, s.lng], {
+    icon: L.divIcon({
+      html: `<div style="background:${color};color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5)">${s.aqi}</div>`,
+      className: '', iconSize: [32,32], iconAnchor: [16,16]
+    })
+  }).addTo(map);
+});
+
+function toggleLayer(name, btn) {
+  btn.classList.toggle('active');
+}
+function highlightSource(type) {}
+
+// ===== TREND CHART =====
+const ctx = document.getElementById('trendChart');
+if (ctx) {
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['12AM','3AM','6AM','9AM','12PM','3PM','6PM','9PM','Now'],
+      datasets: [{
+        data: [198, 224, 256, 312, 286, 271, 268, 274, 286],
+        borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)',
+        fill: true, tension: 0.4, pointRadius: 2
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: '#1e3a5f' } },
+        y: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: '#1e3a5f' } } } }
+  });
+}
+
+// ===== FORECAST CHART =====
+let forecastChartInited = false;
+function initForecastChart() {
+  if (forecastChartInited) return;
+  forecastChartInited = true;
+  const ctx2 = document.getElementById('forecastChart');
+  new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: ['6AM','9AM','12PM','3PM','6PM','9PM','12AM','3AM','6AM','9AM','12PM'],
+      datasets: [
+        { label: 'Actual', data: [218,256,274,268,241,null,null,null,null,null,null], borderColor: '#00d4ff', tension: 0.4, pointRadius: 3 },
+        { label: 'AI Forecast', data: [null,null,null,null,241,271,318,334,320,278,265], borderColor: '#00ff9d', borderDash: [5,5], tension: 0.4, pointRadius: 3 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+      scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1e3a5f' } },
+        y: { ticks: { color: '#64748b' }, grid: { color: '#1e3a5f' }, min: 100 } } }
+  });
+}
+
+// ===== SOURCE CHARTS =====
+let sourceChartsInited = false;
+function initSourceCharts() {
+  if (sourceChartsInited) return;
+  sourceChartsInited = true;
+  new Chart(document.getElementById('sourceChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Vehicle Emissions','Industrial','Construction','Waste Burning','Other'],
+      datasets: [{ data: [42,28,18,8,4], backgroundColor: ['#ef4444','#ff6b35','#f59e0b','#7c3aed','#64748b'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 } } } } }
+  });
+  new Chart(document.getElementById('trendSourceChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Aug','Sep','Oct','Nov','Dec','Jan'],
+      datasets: [
+        { label: 'Vehicles', data: [38,40,39,43,44,42], backgroundColor: '#ef4444' },
+        { label: 'Industrial', data: [24,25,27,29,30,28], backgroundColor: '#ff6b35' },
+        { label: 'Construction', data: [14,16,15,17,18,18], backgroundColor: '#f59e0b' },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 } } } },
+      scales: { x: { stacked: true, ticks: { color: '#64748b' }, grid: { color: '#1e3a5f' } }, y: { stacked: true, ticks: { color: '#64748b' }, grid: { color: '#1e3a5f' } } } }
+  });
+}
+
+// ===== MULTILINGUAL ADVISORY =====
+const advisories = {
+  en: {
+    anand: "⚠️ Air quality is Very Poor today. Avoid all outdoor activities. Keep windows closed. Use N95 masks if stepping out. Children, elderly, and people with respiratory conditions must stay indoors.",
+    dwarka: "Air quality is Poor. Limit outdoor exposure, especially in the morning. Avoid exercising outdoors. Wear a mask when outside.",
+    lodhi: "Air quality is Moderate. Sensitive individuals should reduce prolonged outdoor activity. Generally safe for most people."
+  },
+  hi: {
+    anand: "⚠️ आज वायु गुणवत्ता बहुत खराब है। बाहर जाने से बचें। खिड़कियां बंद रखें। बाहर निकलना हो तो N95 मास्क पहनें। बच्चे, बुजुर्ग और श्वास रोगी घर पर रहें।",
+    dwarka: "वायु गुणवत्ता खराब है। खासकर सुबह बाहर कम रहें। व्यायाम बाहर न करें। बाहर जाने पर मास्क पहनें।",
+    lodhi: "वायु गुणवत्ता मध्यम है। संवेदनशील व्यक्ति बाहरी गतिविधि सीमित करें। अधिकांश लोगों के लिए सामान्यतः सुरक्षित।"
+  },
+  ta: {
+    anand: "⚠️ இன்று காற்றின் தரம் மிகவும் மோசமாக உள்ளது. வெளியில் செல்வதை தவிர்க்கவும். ஜன்னல்களை மூடி வைக்கவும். N95 மாஸ்க் பயன்படுத்தவும்.",
+    dwarka: "காற்றின் தரம் மோசமாக உள்ளது. வெளியில் தங்கும் நேரத்தை குறைக்கவும். மாஸ்க் அணியவும்.",
+    lodhi: "காற்றின் தரம் மிதமானது. பொதுவாக பாதுகாப்பானது. உணர்திறன் உள்ளவர்கள் எச்சரிக்கையாக இருக்கவும்."
+  },
+  kn: {
+    anand: "⚠️ ಇಂದು ವಾಯು ಗುಣಮಟ್ಟ ತುಂಬಾ ಕಳಪೆಯಾಗಿದೆ. ಹೊರಗೆ ಹೋಗುವುದನ್ನು ತಪ್ಪಿಸಿ. ಕಿಟಕಿಗಳನ್ನು ಮುಚ್ಚಿಡಿ. N95 ಮಾಸ್ಕ್ ಬಳಸಿ.",
+    dwarka: "ವಾಯು ಗುಣಮಟ್ಟ ಕಳಪೆಯಾಗಿದೆ. ಹೊರಗಿನ ಚಟುವಟಿಕೆ ಸೀಮಿತಗೊಳಿಸಿ. ಮಾಸ್ಕ್ ಧರಿಸಿ.",
+    lodhi: "ವಾಯು ಗುಣಮಟ್ಟ ಮಧ್ಯಮ. ಸಂವೇದನಶೀಲ ವ್ಯಕ್ತಿಗಳು ಎಚ್ಚರಿಕೆಯಿಂದ ಇರಿ."
+  },
+  bn: {
+    anand: "⚠️ আজ বায়ু মান খুব খারাপ। বাইরে যাওয়া এড়িয়ে চলুন। জানালা বন্ধ রাখুন। N95 মাস্ক ব্যবহার করুন।",
+    dwarka: "বায়ু মান খারাপ। বাইরে থাকার সময় কমান। মাস্ক পরুন।",
+    lodhi: "বায়ু মান মাঝারি। সংবেদনশীল ব্যক্তিরা সতর্ক থাকুন।"
+  }
+};
+
+function setLang(lang, btn) {
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const a = advisories[lang];
+  document.getElementById('adv-anand').textContent = a.anand;
+  document.getElementById('adv-dwarka').textContent = a.dwarka;
+  document.getElementById('adv-lodhi').textContent = a.lodhi;
+}
+
+// Live AQI update simulation
+setInterval(() => {
+  const v = 218 + Math.floor(Math.random() * 10 - 5);
+  document.getElementById('city-aqi').textContent = v;
+}, 5000);
+</script>
+</body>
+</html>
